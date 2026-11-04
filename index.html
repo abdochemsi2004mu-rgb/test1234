@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Eye Within Words</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;background:#03060d;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+#h{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));font:12px system-ui,sans-serif;color:#9bb8d8;opacity:.7;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="h">move to look · tap to blink</div>
+<script>
+const P=[
+"I love you Rim","you are my baby","you are my everything","I am proud of you","you make me happy","you are my soul","you are all I can see",
+"Rim, my heart is yours","every day with you is a gift","you are my favorite person","I choose you, always","you are my home",
+"my heart beats for you","you light up my world","thinking of you, Rim","forever and always","you are my sunshine","I adore you",
+"you are my peace","my favorite place is next to you","you are the best part of my day","I fall for you every day",
+"you are my dream come true","Rim, you are enough, always","you are beautiful, inside and out","I am so lucky to have you",
+"you are my safe place","with you, everything is better","you are my happy ending","my heart found its home in you",
+"you make my heart smile","I will always be here for you","you are my forever","Rim, my love","I cherish you",
+"you are my greatest adventure","you are pure magic","every love song is about you","you had me at Rim","you are my whole world",
+"I am yours","stay with me always","to the moon and back","you are my best friend","you are my favorite hello",
+"I believe in you","you are so brave and strong","you deserve all the love","I miss you, Rim","you are my calm and my storm",
+"loving you is the easiest thing","you are the reason I smile","my heart is full because of you","you are my person",
+"Je t'aime Rim","Te quiero Rim","Ti amo Rim","Ich liebe dich Rim","Mon amour, Rim","Mi vida, Rim","Habibti Rim","Kanbghik Rim",
+"أحبك يا ريم","ريم يا حبيبتي","ريم حياتي","يا قلبي ريم"
+];
+const S=[
+"Rim","my baby","my everything","my soul","I love you","happy","proud of you","all I see","love","you",
+"darling","sweetheart","my heart","forever","always","adore","cherish","beloved","angel","my sunshine","my home","kiss","hug",
+"dream","tender","warmth","joy","bliss","smile","yours","mine","my love","beautiful","precious","treasure","my star","my moon",
+"soulmate","devoted","romance","passion","gentle","sweet","my world","my peace","my person","my forever","cuddle","giggle","glow",
+"Rim","je t'aime","te quiero","ti amo","mon amour","mi vida","habibti","ya qalbi","ريم","حبيبتي","حياتي","قلبي","أحبك"
+];
+const PUP=["Rim","my soul","my baby","love","you","my heart","forever","mine","always","my world","adore","yours","ريم","حبي"];
+const CATCH=["Rim","love","you","happy","joy","kiss","mine","hug","dream","smile","adore","sweet"];
+const pick=a=>a[Math.random()*a.length|0];
+const bag=a=>{let q=[];return()=>{if(!q.length){q=a.slice();for(let i=q.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[q[i],q[j]]=[q[j],q[i]]}}return q.pop()}};
+const nP=bag(P),nS=bag(S),nU=bag(PUP);
+const word=m=>m==="s"?nS():m==="p"?nU():(Math.random()<.6?nP():nS());
+const cv=document.getElementById("c"),ctx=cv.getContext("2d");
+const FONT="px 'Segoe UI',Arial,sans-serif";
+let W,H,Q,WW,WH,CX,CY,EW,EH,IR,PR,s,dpr,field,scl,iris,dim;
+
+function lid(u,t){
+  u=Math.max(-1,Math.min(1,u));
+  const e=Math.pow(Math.max(0,1-u*u),.76);
+  const up=-EH*1.04*e*(1-.11*u-.06*u*u), lo=EH*.88*e*(1+.13*u-.05*u*u), cl=EH*.16*e;
+  return [cl+(up-cl)*t, cl+(lo-cl)*t];
+}
+function eyePath(g,t,gy){
+  g.beginPath();const n=64;
+  for(let i=0;i<=n;i++){const u=-1.01+2.02*i/n,y=lid(u,t)[0];g[i?"lineTo":"moveTo"](CX+u*EW,CY+y+gy)}
+  for(let i=n;i>=0;i--){const u=-1.01+2.02*i/n,y=lid(u,t)[1];g.lineTo(CX+u*EW,CY+y+gy)}
+  g.closePath();
+}
+function layer(w,h){
+  const c=document.createElement("canvas");c.width=Math.ceil(w*Q);c.height=Math.ceil(h*Q);
+  const g=c.getContext("2d");g.scale(Q,Q);return [c,g];
+}
+function dw(g,t,x,y,size,ang,col,bold){
+  g.save();g.translate(x,y);g.rotate(ang);g.font=(bold?"600 ":"")+size+FONT;
+  g.fillStyle=col;g.textAlign="center";g.textBaseline="middle";g.fillText(t,0,0);g.restore();
+}
+
+function build(){
+  W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);
+  cv.width=W*dpr;cv.height=H*dpr;
+  Q=Math.min(1.5*dpr,2400/W);
+  WW=W*1.5;WH=H*1.5;CX=WW/2;CY=WH/2;
+  EW=W*.46;EH=Math.min(H*.3,EW*.36);IR=EH*1.02;PR=IR*.34;
+  s=Math.max(.6,Math.min(W/1512,H/982)*1.18);
+  let g;
+
+  // 1. Field of words filling everything
+  [field,g]=layer(WW,WH);
+  g.fillStyle="#03060d";g.fillRect(0,0,WW,WH);
+  const rs=17*s,maxy=WH*.54;
+  for(let off=-maxy,r=0;off<=maxy;off+=rs,r++){
+    const fs=Math.max(8,(r%4==0?12.8:r%2==0?11.4:10.2)*s);
+    const arch=xx=>{const u=(xx-CX)/EW;return CY+off+off*.42*Math.exp(-.5*(u/.76)**2)*Math.exp(-Math.abs(off)/EH/1.85)};
+    let x=6+Math.random()*18;
+    while(x<WW-8){
+      const t=word("m");g.font=fs+FONT;const w=g.measureText(t).width;
+      const wx=x+w/2,wy=arch(wx);
+      if(wy>-20&&wy<WH+20){
+        const sl=(arch(wx+12)-arch(wx-12))/24,u=(wx-CX)/EW,v=(wy-CY)/EH;
+        const d=Math.hypot(u*.88,v*.78),ly=lid(u,1),dy=wy-CY;
+        let col,a=.85;
+        if(Math.abs(u)<=1.03&&dy>=ly[0]-46*s&&dy<=ly[1]+42*s){col=pick(["#c4def8","#a9c4ec","#8aa6d6","#e4f0ff"]);a=.9}
+        else if(d<1.58)col=pick(["#3e5e94","#4a5290","#38568a","#506ea4"]);
+        else col=pick(["#243a60","#2a426c","#2e325c","#203456"]);
+        g.globalAlpha=a;dw(g,t,wx,wy,fs,Math.atan(sl),col,r%5==0);g.globalAlpha=1;
+      }
+      x+=w+Math.max(10,12*s);
+    }
+  }
+
+  // 2. Sclera (the white of the eye)
+  [scl,g]=layer(WW,WH);
+  g.save();eyePath(g,1,0);g.clip();
+  g.fillStyle="#060b16";g.fillRect(0,0,WW,WH);
+  const N=26;
+  for(let i=0;i<N;i++){
+    const vf=(i+.5)/N,fs=Math.max(8,(10.2+3.6*Math.sin(vf*Math.PI))*s);let u=-.97;
+    while(u<.97){
+      const t=word("m");g.font=fs+FONT;const w=g.measureText(t).width,du=(w+8*s)/EW,um=u+du/2;
+      if(um>.97)break;
+      const l=lid(um,1);if(l[1]-l[0]<fs*.75){u+=du*.65;continue}
+      const a=lid(um-.025,1),b=lid(um+.025,1);
+      const sl=((b[0]+vf*(b[1]-b[0]))-(a[0]+vf*(a[1]-a[0])))/(.05*EW);
+      const sh=Math.max(.38,Math.min(1,1.16-.62*Math.pow(Math.abs(um),1.55)-.22*Math.pow(Math.abs(vf-.52)*1.7,1.5)))*Math.min(1,.56+.7*vf);
+      const c=pick([[244,248,255],[242,236,224],[208,224,244],[184,212,242]]);
+      dw(g,t,CX+um*EW,CY+l[0]+vf*(l[1]-l[0]),fs,Math.atan(sl),`rgb(${c[0]*sh|0},${c[1]*sh|0},${c[2]*sh|0})`,i%4==0);
+      u+=du;
+    }
+  }
+  g.restore();
+
+  // 3. Iris + pupil + highlights
+  dim=IR*2.4;[iris,g]=layer(dim,dim);
+  const ic=dim/2;
+  g.save();g.beginPath();g.arc(ic,ic,IR*.98,0,6.2832);g.clip();
+  g.fillStyle="#050a16";g.fillRect(0,0,dim,dim);
+  for(let k=0;k<14;k++){
+    const f=.96-k*(.59/13),rad=IR*f,fs=Math.max(8,(8.8+(1-f)*4.2)*s);
+    const cols=f>.84?["#204eaf","#4434a8","#186ca8","#523ab6"]:f>.48?["#00defc","#16eeda","#2d9bff","#7652f8","#00c6d2","#44c3ff"]:["#87faff","#55ebff","#b9f5ff","#a28aff"];
+    let th=Math.random()*6.283;const end=th+6.25;
+    while(th<end){
+      const t=word(f<.58?"s":"m");g.font=fs+FONT;const w=g.measureText(t).width,dth=(w+6*s)/Math.max(24,rad),tm=th+dth/2;
+      if(tm>end)break;
+      let a=tm+Math.PI/2;if(Math.sin(tm)>0)a+=Math.PI;
+      dw(g,t,ic+rad*Math.cos(tm),ic+rad*Math.sin(tm),fs,a,pick(cols),k%3==0);
+      th+=dth;
+    }
+  }
+  // pupil
+  g.beginPath();g.arc(ic,ic,PR*.97,0,6.2832);g.fillStyle="#03050b";g.fill();
+  for(const pf of [.88,.72,.56,.4,.24]){
+    const rad=PR*pf,fs=Math.max(7,(8.2+(1-pf)*1.8)*s);let th=Math.random()*6.283;const end=th+6.2;
+    while(th<end){
+      const t=word("p");g.font=fs+FONT;const w=g.measureText(t).width,dth=Math.max(.32,(w+4.5*s)/Math.max(12,rad)),tm=th+dth/2;
+      if(tm>end)break;
+      let a=tm+Math.PI/2;if(Math.sin(tm)>0)a+=Math.PI;
+      dw(g,t,ic+rad*Math.cos(tm),ic+rad*Math.sin(tm),fs,a,"#3e5c96",false);
+      th+=dth;
+    }
+  }
+  dw(g,"Rim",ic,ic,Math.max(9,10*s),0,"#7ea2e0",true);
+  // catchlight words
+  for(let r=-2;r<=2;r++)for(let c=-1;c<=1;c++){
+    const dx=c*34*s,dy=r*14*s,an=-.42;
+    dw(g,pick(CATCH),ic-IR*.34+dx*Math.cos(an)-dy*Math.sin(an),ic-IR*.32+dx*Math.sin(an)+dy*Math.cos(an),Math.max(8,10*s),an,"rgba(255,255,255,.92)",true);
+  }
+  g.restore();
+}
+
+// Interaction
+let bs=0,nextB=performance.now()+2500,gx=0,gy=0,mx=0,my=0,lastM=-1e9,px=0,py=0;
+const blink=()=>{if(!bs)bs=performance.now()};
+addEventListener("pointermove",e=>{mx=e.clientX;my=e.clientY;lastM=performance.now()});
+addEventListener("pointerdown",blink);
+addEventListener("keydown",e=>{if(e.code==="Space"){e.preventDefault();blink()}});
+let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(build,250)});
+
+function frame(now){
+  if(now>nextB){blink();nextB=now+3000+Math.random()*3000}
+  let o=1;
+  if(bs){
+    const e=(now-bs)/1000;
+    if(e<.13){const u=e/.13;o=1-(3*u*u-2*u*u*u)}
+    else if(e<.18)o=0;
+    else if(e<.41){const u=(e-.18)/.23;o=1-Math.pow(1-u,2.6)}
+    else bs=0;
+  }
+  const t=now/1000;let tgx,tgy;
+  if(now-lastM<4500){tgx=((mx/W-.5)*2)*IR*.22;tgy=((my/H-.5)*2)*IR*.16}
+  else{tgx=Math.sin(t*.45)*Math.cos(t*.21)*IR*.1;tgy=Math.sin(t*.32+1.1)*IR*.07}
+  gx+=(tgx-gx)*.08;gy+=(tgy-gy)*.08;
+  const w=.5-.5*Math.cos(t*.3),ez=w*w*(3-2*w),z=1+ez*1.4,zf=ez;
+  px+=(Math.sin(t*.23)*EW*.2*zf+gx-px)*.05;py+=(Math.cos(t*.19)*EH*.2*zf+gy-py)*.05;
+
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#03060d";ctx.fillRect(0,0,cv.width,cv.height);
+  const k=cv.width/W;
+  ctx.setTransform(k*z,0,0,k*z,k*(W/2-z*(CX+px)),k*(H/2-z*(CY+py)));
+  ctx.drawImage(field,0,0,WW,WH);
+  ctx.save();eyePath(ctx,o,gy*.2*o);ctx.clip();
+  ctx.drawImage(scl,0,0,WW,WH);
+  ctx.drawImage(iris,CX+gx-dim/2,CY+gy-EH*.04-dim/2,dim,dim);
+  ctx.restore();
+  eyePath(ctx,o,gy*.2*o);ctx.strokeStyle="rgba(214,232,255,.85)";ctx.lineWidth=2.2;ctx.stroke();
+  requestAnimationFrame(frame);
+}
+build();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
